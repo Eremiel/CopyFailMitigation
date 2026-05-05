@@ -1,7 +1,7 @@
 # Copy Fail (CVE-2026-31431) – Simple Detector & Mitigator
 
 This repository provides a single, self‑contained script to **detect likely Copy Fail (CVE‑2026‑31431) exploitation attempts** and **harden a host** until kernel patches can be applied.  
-Copy Fail is a Linux kernel local privilege escalation that uses `AF_ALG` + `splice()` to perform a controlled 4‑byte write into the page cache of any readable file, enabling in‑memory modification of setuid binaries (for example `/usr/bin/su`) without touching disk [web:2][web:3][web:5][web:8].
+Copy Fail is a Linux kernel local privilege escalation that uses `AF_ALG` + `splice()` to perform a controlled 4‑byte write into the page cache of any readable file, enabling in‑memory modification of setuid binaries (for example `/usr/bin/su`) without touching disk.
 
 > **Important:** This tool does **not** fix the kernel bug. It helps you:
 > - Detect suspicious activity that matches the public exploit chain.
@@ -12,32 +12,32 @@ Copy Fail is a Linux kernel local privilege escalation that uses `AF_ALG` + `spl
 
 ## 1. How the original exploit works (high‑level)
 
-Public writeups and PoCs (for example, by Theori/Xint Code and community repos) describe a compact (≈700‑byte) Python exploit that works on most current distributions [web:2][web:5][web:8]. Although implementations differ, they share the same basic steps:
+Public writeups and PoCs (for example, by Theori/Xint Code and community repos) describe a compact (≈700‑byte) Python exploit that works on most current distributions. Although implementations differ, they share the same basic steps:
 
 1. **Open an AF_ALG crypto socket**  
-   - The exploit uses the Linux userspace crypto API (`AF_ALG`) with an AEAD/`algif_aead` algorithm, typically via Python’s `socket` module [web:2][web:3].  
-   - It configures a context that triggers a buggy “in‑place” copy path in the kernel’s `authencesn` crypto template [web:2][web:8].
+   - The exploit uses the Linux userspace crypto API (`AF_ALG`) with an AEAD/`algif_aead` algorithm, typically via Python’s `socket` module.  
+   - It configures a context that triggers a buggy “in‑place” copy path in the kernel’s `authencesn` crypto template.
 
 2. **Abuse `splice()` into the crypto socket**  
-   - The exploit opens a **target file** that is readable but often privileged, typically a setuid binary such as `/usr/bin/su` [web:3][web:5].  
-   - Using `splice()`, it maps that file into the AF_ALG socket pipeline so the kernel will operate directly on the file’s page cache pages [web:3].  
+   - The exploit opens a **target file** that is readable but often privileged, typically a setuid binary such as `/usr/bin/su`.  
+   - Using `splice()`, it maps that file into the AF_ALG socket pipeline so the kernel will operate directly on the file’s page cache pages.  
 
 3. **Trigger a failed crypto operation that corrupts page cache**  
-   - By providing invalid or mismatched authentication data, the HMAC check fails as expected, but the kernel leaves a small (4‑byte) overwrite in the page cache [web:3][web:8].  
+   - By providing invalid or mismatched authentication data, the HMAC check fails as expected, but the kernel leaves a small (4‑byte) overwrite in the page cache.  
    - The attacker controls:
      - The **target file** (any readable file, usually a setuid root binary).  
      - The **offset** into the cached pages.  
      - The **4‑byte payload** written [web:3].  
 
 4. **Stage payload into a setuid binary and execute it**  
-   - The exploit repeats the primitive across successive offsets to build a small “patch” into the cached image of `/usr/bin/su` or a similar binary [web:3][web:5].  
-   - When the attacker later runs `su`, the process executes the modified, in‑memory binary and yields a **root shell**, even though the on‑disk file remains clean [web:2][web:3][web:5].  
+   - The exploit repeats the primitive across successive offsets to build a small “patch” into the cached image of `/usr/bin/su` or a similar binary  
+   - When the attacker later runs `su`, the process executes the modified, in‑memory binary and yields a **root shell**, even though the on‑disk file remains clean.  
 
 5. **Why detection is hard**  
-   - Traditional file integrity monitoring tools only look at disk; they see no change, because the exploit modifies the **page cache only** [web:2][web:5][web:8].  
-   - Container boundaries are also bypassed, because all containers share the host kernel and its page cache [web:2][web:9][web:12].
+   - Traditional file integrity monitoring tools only look at disk; they see no change, because the exploit modifies the **page cache only**.  
+   - Container boundaries are also bypassed, because all containers share the host kernel and its page cache.
 
-Kadir’s IOC toolkit focuses on covering these aspects from a defender’s point of view, with **auditd rules**, **eBPF monitoring of AF_ALG + splice chains**, and **page‑cache vs disk divergence detection for setuid binaries**, plus Sigma rules for SIEMs [web:7]. This project takes the same ideas but compresses them into a single, simpler script.
+[Kadir’s IOC toolkit](https://github.com/kadir/copy-fail-CVE-2026-31431-IOC) focuses on covering these aspects from a defender’s point of view, with **auditd rules**, **eBPF monitoring of AF_ALG + splice chains**, and **page‑cache vs disk divergence detection for setuid binaries**, plus Sigma rules for SIEMs. This project takes the same ideas but compresses them into a single, simpler script.
 
 ---
 
@@ -46,7 +46,7 @@ Kadir’s IOC toolkit focuses on covering these aspects from a defender’s poin
 The `copyfail-guard.sh` script provides:
 
 1. **Vulnerability check**
-   - Detects whether the running kernel is likely affected (based on version heuristics and presence of vulnerable modules such as `algif_aead` and `authencesn`) [web:2][web:6][web:12].  
+   - Detects whether the running kernel is likely affected (based on version heuristics and presence of vulnerable modules such as `algif_aead` and `authencesn`).  
 
 2. **Detector**
    - Checks for suspicious patterns in recent logs:
@@ -58,8 +58,8 @@ The `copyfail-guard.sh` script provides:
 
 3. **Mitigator / Hardening**
    - Optionally:
-     - Restricts use of `AF_ALG` to root using simple sysctl and file permission checks, where viable [web:2][web:6].  
-     - Suggests disabling the vulnerable module (`algif_aead`) if it is loadable as a module and you can blacklist it [web:2][web:6][web:12].  
+     - Restricts use of `AF_ALG` to root using simple sysctl and file permission checks, where viable.  
+     - Suggests disabling the vulnerable module (`algif_aead`) if it is loadable as a module and you can blacklist it.  
      - Assists with kernel patch validation (shows current kernel and advises on updating).
 
 4. **Reporting**
@@ -155,17 +155,17 @@ Status: HARDENING SUGGESTED (manual steps required)
 
 - This script does not inspect raw page‑cache state and **cannot reliably prove** that no in‑memory tampering occurred.  
 - Logs and audit rules may be incomplete or absent; sophisticated attackers may clear traces.  
-- The only definitive mitigation is to **update the kernel to a fixed version** released by your Linux vendor [web:2][web:6][web:12].  
+- The only definitive mitigation is to **update the kernel to a fixed version** released by your Linux vendor.  
 - For high security environments, consider deploying:
   - eBPF monitors that correlate `AF_ALG` + `splice()` usage per PID.  
-  - SIEM integration with Copy Fail–specific Sigma rules (as in Kadir’s IOC toolkit) [web:7].  
+  - SIEM integration with Copy Fail–specific Sigma rules (as in Kadir’s IOC toolkit).  
 
 ---
 
 ## 6. References
 
-- Xint Code / Theori – Copy Fail technical analysis [web:2][web:8].  
-- Vendor and CERT advisories for CVE‑2026‑31431 [web:6][web:11][web:12][web:14].  
-- Community IOC toolkit repository description and posts (Kadir’s `copy-fail-CVE-2026-31431-IOC`) [web:7][web:10].  
+- Xint Code / Theori – Copy Fail technical analysis.  
+- Vendor and CERT advisories for CVE‑2026‑31431.  
+- Community IOC toolkit repository description and posts (Kadir’s `copy-fail-CVE-2026-31431-IOC`).  
 
 Use this script and documentation as a starting point and adapt it to your environment’s logging, monitoring, and compliance requirements.
