@@ -77,7 +77,7 @@ This is intentionally minimal: it does not replace a full eBPF + SIEM stack, but
 ### 3.1. Download
 
 ```bash
-curl -O https://example.com/copyfail-guard.sh
+curl -O https://raw.githubusercontent.com/Eremiel/CopyFailMitigation/refs/heads/main/copyfail-guard.sh
 chmod +x copyfail-guard.sh
 ```
 
